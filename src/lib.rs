@@ -104,7 +104,7 @@ pub trait JigglyBoard {
                             settled = false;
                             let velocity = velocity + dt * physprop.gravity;
                             let y_bottom = y_bottom - velocity * dt;
-                            if y_bottom <= y as f32 {
+                            if y_bottom <= jiggle_offset {
                                 jiggle_propagations.push(JigglePropagation {
                                     at: location,
                                     impulse: physprop.velocity_to_impact * velocity,
@@ -161,7 +161,7 @@ pub trait JigglyBoard {
                                 }
                             } else {
                                 let life = life - physprop.jiggle_life_decrease_rate * dt;
-                                let y_scale = (-offset).max(-1.0);
+                                let y_scale = (1.0 - offset).max(0.0);
                                 let x_scale = y_scale.max(0.5).recip();
                                 jiggle_offset += y_scale;
                                 SlimePropsOut {
