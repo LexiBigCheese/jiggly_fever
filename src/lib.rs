@@ -65,6 +65,10 @@ pub trait JigglyBoard {
     type Dir: Direction + Copy + Clone;
     type Loc: Copy + Clone;
     ///This acts as the "Jiggle Allowed in Direction", "Get new Location", and "Jiggle Falloff/Transfer" function
+    ///
+    /// MAKE SURE TO CHECK IF THE NEXT SLIME IS FALLING, AND IF SO, RETURN NONE!
+    ///
+    /// OTHERWISE YOU GET A VERY CONFUSING SOURCE OF JANK!
     fn apply_dir_to_loc(
         &self,
         dir: Self::Dir,
