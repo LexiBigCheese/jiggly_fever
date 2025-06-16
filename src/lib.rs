@@ -103,7 +103,7 @@ pub trait JigglyBoard {
                         Falling { velocity } => {
                             settled = false;
                             let velocity = velocity + dt * physprop.gravity;
-                            let y_bottom = y_bottom - velocity * dt;
+
                             if y_bottom <= jiggle_offset {
                                 jiggle_propagations.push(JigglePropagation {
                                     at: location,
@@ -111,7 +111,7 @@ pub trait JigglyBoard {
                                     came_from: Self::Dir::UP,
                                 });
                                 let y_bottom = jiggle_offset;
-                                jiggle_offset += 1.0;
+                                // jiggle_offset += 1.0;
                                 SlimePropsOut {
                                     state: Jiggling {
                                         momentum: 0.0,
@@ -123,6 +123,7 @@ pub trait JigglyBoard {
                                     y_bottom,
                                 }
                             } else {
+                                let y_bottom = y_bottom - velocity * dt;
                                 let clamped_vel = velocity.mul(1.0 / 9.0).add(1.0).clamp(1.0, 2.0);
                                 let x_scale = 1.0 / clamped_vel;
                                 let y_scale = 1.0 * clamped_vel;
