@@ -29,10 +29,9 @@ pub enum SlimeState {
     },
 }
 
-pub struct SlimePropsIn<Loc> {
+pub struct SlimePropsIn {
     pub state: SlimeState,
     pub y_bottom: f32,
-    pub location: Loc,
 }
 
 pub struct SlimePropsOut {
@@ -42,8 +41,8 @@ pub struct SlimePropsOut {
     pub x_scale: f32,
 }
 
-pub trait MutSlime<Loc> {
-    fn modify_slime(&mut self, f: impl FnOnce(SlimePropsIn<Loc>) -> SlimePropsOut);
+pub trait MutSlime {
+    fn modify_slime(&mut self, f: impl FnOnce(SlimePropsIn) -> SlimePropsOut);
 }
 
 pub trait JiggleImpulsable {
@@ -62,10 +61,6 @@ pub struct JigglePropagation<Loc, Dir> {
     pub came_from: Dir,
 }
 
-pub trait MutCol<Loc> {
-    fn y_slime(&mut self, f: impl FnMut(usize, SlimePropsIn<Loc>) -> SlimePropsOut);
-}
-
 pub trait JigglyBoard {
     type Dir: Direction + Copy + Clone;
     type Loc: Copy + Clone;
@@ -76,24 +71,23 @@ pub trait JigglyBoard {
         loc: Self::Loc,
         impulse: f32,
     ) -> Option<(Self::Loc, f32)>;
-    type Col: MutCol<Self::Loc>;
-    fn cols_mut(&mut self, f: impl FnMut(Self::Col));
-    fn impulse_jiggle_at(&mut self, loc: Self::Loc) -> Option<impl JiggleImpulsable>;
+    fn cols(&self) -> impl Iterator<Item = impl Iterator<Item = Self::Loc>>;
+    fn mut_slime_with(&mut self, loc: Self::Loc, f: impl FnOnce(SlimePropsIn) -> SlimePropsOut);
+    fn impulse_jiggle_with(&mut self, loc: Self::Loc, f: impl FnOnce(SlimeState) -> SlimeState);
 
     /// If this returns true, the board is settled
     fn run_physics(&mut self, dt: f32, physprop: &PhysicsProperties) -> bool {
         let mut jiggle_propagations: alloc::vec::Vec<JigglePropagation<Self::Loc, Self::Dir>> =
             alloc::vec![];
         let mut settled = true;
-        self.cols_mut(|mut col| {
+        let cols = self
+            .cols()
+            .map(|col| col.enumerate().collect::<alloc::vec::Vec<_>>())
+            .collect::<alloc::vec::Vec<_>>();
+        for col in cols {
             let mut jiggle_offset = 0.0;
-            col.y_slime(
-                |y,
-                 SlimePropsIn {
-                     state,
-                     y_bottom,
-                     location,
-                 }| {
+            for (y, location) in col {
+                self.mut_slime_with(location, |SlimePropsIn { state, y_bottom }| {
                     use SlimeState::*;
                     match state {
                         Settled => {
@@ -183,9 +177,9 @@ pub trait JigglyBoard {
                             }
                         }
                     }
-                },
-            );
-        });
+                });
+            }
+        }
         //Now run through jiggle propagations
         for propagation in jiggle_propagations {
             self.propagate_jiggle(propagation, physprop);
@@ -211,33 +205,30 @@ pub trait JigglyBoard {
             return;
         }
         use SlimeState::*;
-        {
-            let Some(mut slime) = self.impulse_jiggle_at(at) else {
-                return;
-            };
-            slime.modify_state(|state| {
-                match state {
-                    Settled => Jiggling {
-                        momentum: impulse,
-                        offset: 0.0,
-                        life: 1.0,
-                    },
-                    //Note: this really should not be encountered, but it will have defined behaviour in the case it is.
-                    Falling { velocity } => Jiggling {
-                        momentum: impulse + velocity * *velocity_to_impact,
-                        offset: 0.0,
-                        life: 1.0,
-                    },
-                    Jiggling {
-                        momentum, offset, ..
-                    } => Jiggling {
-                        momentum: momentum + impulse,
-                        offset,
-                        life: 1.0,
-                    },
-                }
-            });
-        }
+
+        self.impulse_jiggle_with(at, |state| {
+            match state {
+                Settled => Jiggling {
+                    momentum: impulse,
+                    offset: 0.0,
+                    life: 1.0,
+                },
+                //Note: this really should not be encountered, but it will have defined behaviour in the case it is.
+                Falling { velocity } => Jiggling {
+                    momentum: impulse + velocity * *velocity_to_impact,
+                    offset: 0.0,
+                    life: 1.0,
+                },
+                Jiggling {
+                    momentum, offset, ..
+                } => Jiggling {
+                    momentum: momentum + impulse,
+                    offset,
+                    life: 1.0,
+                },
+            }
+        });
+
         for dir in came_from.other_directions() {
             let Some((at, impulse)) = self.apply_dir_to_loc(dir, at, impulse) else {
                 continue;
