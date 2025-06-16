@@ -82,11 +82,11 @@ pub trait JigglyBoard {
         let mut settled = true;
         let cols = self
             .cols()
-            .map(|col| col.enumerate().collect::<alloc::vec::Vec<_>>())
+            .map(|col| col.collect::<alloc::vec::Vec<_>>())
             .collect::<alloc::vec::Vec<_>>();
         for col in cols {
             let mut jiggle_offset = 0.0;
-            for (y, location) in col {
+            for location in col {
                 self.mut_slime_with(location, |SlimePropsIn { state, y_bottom }| {
                     use SlimeState::*;
                     match state {
